@@ -41,16 +41,16 @@ an 802.15.4 sniffer firmware, `analyze_join.py` (join and key-delivery analysis;
 lowered that by only about 1 °C, so it was reverted in favour of performance and reliability. The heat is the radio, which a
 router keeps listening all the time, plus the board's linear regulator. TX power is 20 dBm. The console has a `temp` command.
 
+**Status at 2026-10-17:** paired with the Hue Bridge. On/off, dimming, room controls and scenes all work, and the app follows
+the button. The regression suite passes, with `test_scenes` reported as an expected failure. Hue scenes work despite the
+library: the bridge recalls the scene through a group, then sends on/off and level directly to the lamp. The Hue key moved
+to the git-ignored `sdkconfig.local`. The project is in git. `CLAUDE.md` holds the hand-over notes and the production
+to-do list.
+
 **Still open**
-- **Zigbee scenes:** esp-zigbee-lib 2.0.4 stores no scenes (Recall returns NOT_FOUND), and the 2.0.5 release notes don't
-  mention a fix. Whether this matters depends on how your bridge recalls scenes for third-party lights. See *Next steps*.
-- **Key in the project files:** done. The key is now in the git-ignored `sdkconfig.local`; see README *Building*.
 - **Library workarounds:** the descriptor and Off-with-effect fixes depend on esp-zigbee-lib 2.0.4 internals. Re-check
   them if you upgrade the library.
-
-**Next steps:** re-pair with Hue after the regression run. Then create a Hue scene that includes the lamp and recall it.
-If it works, the bridge drives scenes with direct commands and nothing more is needed. If not, the firmware needs its
-own scene table.
+- **Production:** PWM output stage, final GPIOs, test console off, optional OTA and a switching regulator.
 
 The sections below are the original report. Where they conflict, this update supersedes them (the test count, the Hue
 key limitation, and the factory-reset paths).
