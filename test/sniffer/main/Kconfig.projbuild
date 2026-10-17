@@ -1,0 +1,6 @@
+menu "Sniffer"
+    config SNIFFER_CHANNEL
+        int "Initial 802.15.4 channel (11-26)"
+        range 11 26
+        default 20
+endmenu

@@ -1,0 +1,16 @@
+CONFIG_IDF_TARGET="esp32c6"
+
+# Flash: 4MB is the smallest ESP32-C6-Zero variant (8MB parts work too)
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+
+# Partition Table
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# The Zero board only exposes the native USB Serial/JTAG port
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# Zigbee (router)
+CONFIG_ZB_ENABLED=y
+CONFIG_ZB_ZCZR=y
+CONFIG_ZB_RADIO_NATIVE=y

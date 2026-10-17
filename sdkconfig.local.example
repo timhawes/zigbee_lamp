@@ -1,0 +1,4 @@
+# Copy to sdkconfig.local (git-ignored) and fill in the key. See README "Pairing with Hue".
+# Without it the lamp joins with the standard Zigbee 3.0 key only and can't pair with a Hue bridge.
+# Philips Hue: ZLL pre-configured link key (32 hex digits).
+CONFIG_LAMP_ALT_GLOBAL_LINK_KEY=""

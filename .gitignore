@@ -1,0 +1,7 @@
+build/
+managed_components/
+sdkconfig
+sdkconfig.old
+sdkconfig.local
+test/test_lamp.log
+__pycache__/

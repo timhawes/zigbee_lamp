@@ -1,0 +1,87 @@
+menu "Lamp configuration"
+
+    menu "Hardware"
+        config LAMP_LED_GPIO
+            int "WS2812 RGB LED GPIO"
+            default 8
+            help
+                Data pin of the addressable LED used as the light output.
+                GPIO8 on the Waveshare ESP32-C6-Zero.
+
+        config LAMP_LED_MAX_BRIGHTNESS
+            int "LED channel value at full level (1-255)"
+            range 1 255
+            default 255
+            help
+                Caps the RGB channel value at level 254. The onboard LED is very
+                bright, so this can be lowered for desk testing.
+
+        config LAMP_BUTTON_GPIO
+            int "Button GPIO"
+            default 9
+            help
+                Local control button. GPIO9 is the BOOT button on the
+                ESP32-C6-Zero.
+
+        config LAMP_BUTTON_ACTIVE_LOW
+            bool "Button is active low"
+            default y
+
+        config LAMP_BUTTON_PULLUP
+            bool "Enable internal pull-up on the button pin"
+            default y
+    endmenu
+
+    menu "Button behaviour"
+        config LAMP_HOLD_THRESHOLD_MS
+            int "Press longer than this (ms) starts dimming"
+            default 400
+
+        config LAMP_DIM_SWEEP_MS
+            int "Time (ms) to dim across the full range while holding"
+            default 3000
+
+        config LAMP_BOOT_RESET_WINDOW_MS
+            int "Factory-reset gesture: press must start within this time after boot (ms)"
+            default 1000
+
+        config LAMP_BOOT_RESET_HOLD_MS
+            int "Factory-reset gesture: hold time required (ms)"
+            default 2000
+    endmenu
+
+    menu "Zigbee"
+        config LAMP_MANUFACTURER_NAME
+            string "Basic cluster ManufacturerName"
+            default "DIY"
+
+        config LAMP_MODEL_ID
+            string "Basic cluster ModelIdentifier"
+            default "C6-Zero-Lamp"
+
+        config LAMP_STEERING_RETRY_MS
+            int "Delay between network-steering attempts while unjoined (ms)"
+            default 10000
+
+        config LAMP_ALT_GLOBAL_LINK_KEY
+            string "Alternative global TC link key (32 hex chars, empty = standard key only)"
+            default ""
+            help
+                Philips Hue bridges deliver the network key encrypted with the ZLL
+                pre-configured link key rather than the standard Zigbee 3.0 key.
+                When set, pairing attempts alternate between this key and the
+                standard key, so both Hue and standard coordinators work.
+
+        config LAMP_JOIN_DISTRIBUTED
+            bool "Allow joining distributed-security networks"
+            default n
+    endmenu
+
+    config LAMP_TEST_CONSOLE
+        bool "Enable test console on USB Serial/JTAG"
+        default y
+        help
+            Adds console commands (btn, status, factory_reset) used by the
+            automated test jig. Disable for production builds.
+
+endmenu
