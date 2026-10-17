@@ -85,8 +85,12 @@ which were used to debug the Hue integration.
 ## Known limitations
 
 - **Zigbee scenes don't work.** esp-zigbee-lib 2.0.4 accepts Add, Store and Recall Scene but never stores anything: Recall returns
-  NOT_FOUND. This is also true in 2.0.5 according to its release notes. Hue scenes that rely on scenes stored in the light won't
-  recall. `test_scenes` documents this and is expected to fail.
+  NOT_FOUND. This is also true in 2.0.5 according to its release notes. In practice Hue scenes still work: the bridge sends
+  Recall Scene to a group and then sends the scene's on/off and level directly to the light (seen in sniffer captures).
+  `test_scenes` documents the library behaviour and is reported as an expected failure.
+- **Rooms after a factory reset:** a factory reset clears the lamp's group memberships. If the lamp is re-paired while the bridge
+  still lists it in a room, room controls don't reach it until the bridge restores the membership. The bridge does this by
+  itself after a while, without another re-pair.
 - The WS2812's 8-bit channels give coarse steps at the bottom of the dimming range. A real output should use higher-resolution PWM.
 - If the light is off and receives *Move to Level with On/Off* with a transition, the stack turns it on at the stored level and then moves. The output smoothing softens this, but the start may be briefly brighter.
 - The boot-time factory-reset gesture can't be tested automatically: the console isn't up within the 1 s window.

@@ -4,7 +4,7 @@
 The network key is recovered in memory from the captured APS Transport-Key (using the given link
 key) and is never printed. Prints ZDO and ZCL exchanges to/from the device's short address.
 
-Usage: decode_session.py CAPTURE --joiner IEEE --link-key HEX [--short 0xNNNN]
+Usage: decode_session.py CAPTURE --joiner IEEE --link-key HEX [--short 0xNNNN] [--broadcasts]
 """
 
 import argparse
@@ -66,7 +66,9 @@ def describe_aps(aps):
         return f"APS command 0x{aps[2]:02x}"
     o = 1
     dst_ep = None
+    group = None
     if delivery == 3:
+        group = struct.unpack_from("<H", aps, o)[0]
         o += 2
     else:
         dst_ep = aps[o]
@@ -96,7 +98,8 @@ def describe_aps(aps):
     kind = ZCL_GLOBAL.get(cmd, f"cmd 0x{cmd:02x}") if (fc & 3) == 0 else f"cluster-cmd 0x{cmd:02x}"
     d = "to-client" if fc & 0x08 else "to-server"
     m = f" manuf=0x{manuf:04x}" if manuf is not None else ""
-    return f"ZCL ep{src_ep}->ep{dst_ep} {d} prof=0x{profile:04x} {cl} {kind}{m} {body.hex()}"
+    to = f"group 0x{group:04x}" if group is not None else f"ep{dst_ep}"
+    return f"ZCL ep{src_ep}->{to} {d} prof=0x{profile:04x} {cl} {kind}{m} {body.hex()}"
 
 
 def main():
@@ -106,6 +109,7 @@ def main():
     ap.add_argument("--link-key", required=True)
     ap.add_argument("--key-capture", help="capture containing the joiner's key delivery (default: CAPTURE)")
     ap.add_argument("--short", help="joiner short address, if no association is in the capture")
+    ap.add_argument("--broadcasts", action="store_true", help="also show broadcasts (group commands) from any device")
     args = ap.parse_args()
     joiner = args.joiner.upper()
     link_key = bytes.fromhex(args.link_key.replace(" ", ""))
@@ -157,7 +161,8 @@ def main():
             continue
         p = m["payload"]
         n = parse_nwk(p)
-        if not n or not n["sec"] or short not in (n["src"], n["dst"]):
+        bcast = n and n["dst"] in ("0xfffc", "0xfffd", "0xffff")
+        if not n or not n["sec"] or (short not in (n["src"], n["dst"]) and not (args.broadcasts and bcast)):
             continue
         hl = nwk_header_len(p)
         pt = nwk_decrypt(p, hl, nwk_key)
@@ -174,7 +179,12 @@ def main():
                 desc = describe_aps(pt)
             except (IndexError, struct.error):
                 desc = f"APS ? {pt.hex()}"
-        who = "lamp->" + n["dst"] if n["src"] == short else n["src"] + "->lamp"
+        if n["src"] == short:
+            who = "lamp->" + n["dst"]
+        elif n["dst"] == short:
+            who = n["src"] + "->lamp"
+        else:
+            who = n["src"] + "->" + n["dst"]
         print(f"{ts - t0:8.2f}s {who:14s} {desc}")
     return 0
 
