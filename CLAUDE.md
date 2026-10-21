@@ -64,17 +64,18 @@ Run `jig_setup.sh` afterwards to restore the jig.
 
 - Touch is wired on the lamp board and works with PWM edge alignment; thresholds are ON 5 % / OFF 2.5 % / release 50 ms.
   Final-wiring touch strength (REPORT entry 8): taps 109–121 ‰, holds ~133 ‰, light touches 49–84 ‰. Two
-  unrequested toggles during joins/boots on 2026-10-21 didn't reproduce in 36 more tries. Hands-off check: `touch raw`, then `btn press` toggles and `btn hold` sweeps;
-  expect no extra toggles and `TR` window deltas under about 30.
+  unrequested toggles during joins/boots on 2026-10-21 didn't reproduce in 36 more tries.
+- The production profile now has the test console and interference indicator off (onboard LED blanked at boot).
+  For any touch or jig testing, set `CONFIG_LAMP_TEST_CONSOLE=y` and `CONFIG_LAMP_INTERFERENCE_LED=y` in
+  `build-prod/sdkconfig`, rebuild and app-flash; turn them off again afterwards. Hands-off check: `touch raw`, then
+  `btn press` toggles and `btn hold` sweeps; expect no extra toggles and `TR` window deltas under about 30.
 - PWM is on GPIO15 with a 4.7 kΩ pull-down at the PT4115 (its DIM pin has a 200 kΩ internal pull-up). The pin is
   left floating for 1 s after power-on (`LAMP_PWM_POWERON_DELAY_MS`): the 24 V power-up surge shifts the ESP32's
   ground enough to flash the driver through a pin driven low.
-- Wiring is final. Set `CONFIG_LAMP_TEST_CONSOLE=n` in `sdkconfig.defaults.production`.
+- Wiring is final.
 - Optional Zigbee OTA. This needs two app partitions; currently there is a single factory slot.
 - Optional switching regulator, to cut heat.
 - PWM is 20 kHz because the PT4115's inductor sings at 2 kHz (an inductor swap didn't help). It depends on the
   rerouted pad lead and the 20 kHz edge placement (REPORT entries 5–7). Re-run `touch scan` after any wiring change.
-- The user is trying pad-lead routing (twisted pair, positions) using the interference indicator. Measure it with
-  `touch scan` (onboard LED: green to red; `SCAN worst=` per cycle). Turn `LAMP_INTERFERENCE_LED` off along with the
-  test console.
+- After any pad-lead change, measure with `touch scan` (onboard LED: green to red; `SCAN worst=` per cycle).
 - The factory-reset gesture (press within 5 s of power-up, hold 15 s) hasn't been triggered on hardware yet: it unpairs the lamp.

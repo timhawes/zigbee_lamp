@@ -61,6 +61,32 @@ esp_err_t interference_led_start(void)
     return ESP_OK;
 }
 
+#elif CONFIG_LAMP_OUTPUT_PWM
+
+#include "esp_check.h"
+#include "led_strip.h"
+
+static const char *TAG = "interference_led";
+static led_strip_handle_t s_strip;
+
+/* Indicator disabled: send the onboard LED one "off" frame so it can't show a colour latched from noise on its
+ * data line during power-up. The strip stays allocated so the RMT holds the line idle (low). */
+esp_err_t interference_led_start(void)
+{
+    led_strip_config_t strip_config = {
+        .strip_gpio_num = CONFIG_LAMP_LED_GPIO,
+        .max_leds = 1,
+        .led_model = LED_MODEL_WS2812,
+        .color_component_format = LED_STRIP_COLOR_COMPONENT_FMT_GRB,
+    };
+    led_strip_rmt_config_t rmt_config = {
+        .clk_src = RMT_CLK_SRC_DEFAULT,
+        .resolution_hz = 10 * 1000 * 1000,
+    };
+    ESP_RETURN_ON_ERROR(led_strip_new_rmt_device(&strip_config, &rmt_config, &s_strip), TAG, "LED init failed");
+    return led_strip_clear(s_strip);
+}
+
 #else
 
 esp_err_t interference_led_start(void)

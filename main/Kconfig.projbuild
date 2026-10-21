@@ -93,11 +93,11 @@ menu "Lamp configuration"
 
         config LAMP_LED_GPIO
             int "WS2812 RGB LED GPIO"
-            depends on LAMP_OUTPUT_WS2812 || LAMP_INTERFERENCE_LED
             default 8
             help
                 Data pin of the onboard addressable LED: the light output in the dev
-                profile, or the interference indicator. GPIO8 on the Waveshare ESP32-C6-Zero.
+                profile. With PWM output it shows the interference indicator, or is
+                turned off at boot. GPIO8 on the Waveshare ESP32-C6-Zero.
 
         config LAMP_LED_MAX_BRIGHTNESS
             int "LED channel value at full level (1-255)"
@@ -167,6 +167,7 @@ menu "Lamp configuration"
                 the untouched reading moves; during "touch scan" it shows the worst offset
                 found while the PWM sweeps from off to full. For trying out the touch
                 wiring; turn it off with the test console once the wiring is final.
+                When off, the LED is sent one "off" frame at boot and stays dark.
 
         config LAMP_PAIRING_INDICATION
             bool "Breathe the output while not joined to a network"

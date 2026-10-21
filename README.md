@@ -53,7 +53,9 @@ steering retry interval, an alternative global link key (from `sdkconfig.local`)
 
 The production profile adds `sdkconfig.defaults.production` and keeps its own `sdkconfig` in `build-prod/`, so it
 doesn't disturb the dev configuration. Flash it with the same `-B`/`-DSDKCONFIG`/`-DLAMP_PROFILE` arguments plus
-`-p <port> app-flash`. The test console is still enabled in this profile until the touch thresholds are tuned.
+`-p <port> app-flash`. The test console and the interference indicator are off in this profile, and the onboard LED
+is turned off at boot. To use `touch scan`, the jig or the indicator, set `CONFIG_LAMP_TEST_CONSOLE=y` and
+`CONFIG_LAMP_INTERFERENCE_LED=y` in `build-prod/sdkconfig` and rebuild.
 
 ### Production wiring
 
@@ -133,7 +135,7 @@ lower `LAMP_TOUCH_DRIVE_HZ`.
 
 ### Interference indicator
 
-With `LAMP_INTERFERENCE_LED` (on by default in the production profile), the onboard WS2812 shows how much the LED
+With `LAMP_INTERFERENCE_LED` (off in the finished production profile; turn it on for wiring work), the onboard WS2812 shows how much the LED
 driver disturbs the touch reading. It goes from green (clean), through yellow (half the ON threshold), to red (at the
 ON threshold, which causes false touches).
 
