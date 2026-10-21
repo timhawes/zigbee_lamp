@@ -32,6 +32,19 @@ static const char *TAG = "zigbee_light";
 #define STARTUP_LEVEL_MIN       0x00
 #define STARTUP_LEVEL_PREVIOUS  0xFF
 
+#if CONFIG_LAMP_STARTUP_ON
+#define STARTUP_ON_OFF_DEFAULT  STARTUP_ON_OFF_ON
+#elif CONFIG_LAMP_STARTUP_PREVIOUS
+#define STARTUP_ON_OFF_DEFAULT  STARTUP_ON_OFF_PREVIOUS
+#else
+#define STARTUP_ON_OFF_DEFAULT  STARTUP_ON_OFF_OFF
+#endif
+
+/* StartUp* are stored only when a coordinator writes them, so the Kconfig default applies otherwise.
+ * Older firmware saved them on every state change under the legacy keys; those are erased on load. */
+#define NVS_KEY_SU_ONOFF        "su_onoff_w"
+#define NVS_KEY_SU_LEVEL        "su_level_w"
+
 typedef struct {
     bool on;
     uint8_t level;
@@ -43,7 +56,7 @@ static portMUX_TYPE s_state_lock = portMUX_INITIALIZER_UNLOCKED;
 static lamp_state_t s_state = {
     .on = true,
     .level = LAMP_LEVEL_MAX,
-    .startup_on_off = STARTUP_ON_OFF_ON,
+    .startup_on_off = STARTUP_ON_OFF_DEFAULT,
     .startup_level = STARTUP_LEVEL_PREVIOUS,
 };
 static esp_timer_handle_t s_save_timer;
@@ -67,15 +80,19 @@ static volatile bool s_joined;
 static void state_load(void)
 {
     nvs_handle_t h;
-    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &h) != ESP_OK) {
+    if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h) != ESP_OK) {
         ESP_LOGI(TAG, "No saved state, using defaults");
         return;
     }
     uint8_t v;
     if (nvs_get_u8(h, "on", &v) == ESP_OK) s_state.on = v;
     if (nvs_get_u8(h, "level", &v) == ESP_OK) s_state.level = v;
-    if (nvs_get_u8(h, "su_onoff", &v) == ESP_OK) s_state.startup_on_off = v;
-    if (nvs_get_u8(h, "su_level", &v) == ESP_OK) s_state.startup_level = v;
+    if (nvs_get_u8(h, NVS_KEY_SU_ONOFF, &v) == ESP_OK) s_state.startup_on_off = v;
+    if (nvs_get_u8(h, NVS_KEY_SU_LEVEL, &v) == ESP_OK) s_state.startup_level = v;
+    if ((nvs_erase_key(h, "su_onoff") == ESP_OK) | (nvs_erase_key(h, "su_level") == ESP_OK)) {
+        nvs_commit(h);
+        ESP_LOGI(TAG, "Dropped legacy StartUp* keys");
+    }
     uint16_t addr;
     if (nvs_get_u16(h, "ctl_addr", &addr) == ESP_OK && nvs_get_u8(h, "ctl_ep", &v) == ESP_OK) {
         s_controller.valid = true;
@@ -99,8 +116,6 @@ static void state_save_now(void *arg)
     }
     nvs_set_u8(h, "on", st.on);
     nvs_set_u8(h, "level", st.level);
-    nvs_set_u8(h, "su_onoff", st.startup_on_off);
-    nvs_set_u8(h, "su_level", st.startup_level);
     nvs_commit(h);
     nvs_close(h);
     ESP_LOGD(TAG, "State saved");
@@ -130,6 +145,18 @@ static void controller_remember(uint16_t short_addr, uint8_t ep)
         nvs_commit(h);
         nvs_close(h);
     }
+}
+
+/* Persist a StartUp* attribute written by a coordinator. */
+static void startup_attr_save(const char *key, uint8_t value)
+{
+    nvs_handle_t h;
+    if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h) == ESP_OK) {
+        nvs_set_u8(h, key, value);
+        nvs_commit(h);
+        nvs_close(h);
+    }
+    ESP_LOGI(TAG, "%s set to 0x%02x", key, value);
 }
 
 static void state_erase(void)
@@ -405,6 +432,7 @@ static void handle_set_attr(const ezb_zcl_set_attr_value_message_t *msg)
 
     bool output_changed = false;
     bool save = false;
+    const char *startup_key = NULL;
     uint8_t u8 = *(uint8_t *)attr->data.value;
 
     portENTER_CRITICAL(&s_state_lock);
@@ -415,7 +443,7 @@ static void handle_set_attr(const ezb_zcl_set_attr_value_message_t *msg)
             output_changed = save = true;
         } else if (attr->id == EZB_ZCL_ATTR_ON_OFF_START_UP_ON_OFF_ID) {
             s_state.startup_on_off = u8;
-            save = true;
+            startup_key = NVS_KEY_SU_ONOFF;
         }
         break;
     case EZB_ZCL_CLUSTER_ID_LEVEL:
@@ -424,7 +452,7 @@ static void handle_set_attr(const ezb_zcl_set_attr_value_message_t *msg)
             output_changed = save = true;
         } else if (attr->id == EZB_ZCL_ATTR_LEVEL_START_UP_CURRENT_LEVEL_ID) {
             s_state.startup_level = u8;
-            save = true;
+            startup_key = NVS_KEY_SU_LEVEL;
         }
         break;
     default:
@@ -445,6 +473,9 @@ static void handle_set_attr(const ezb_zcl_set_attr_value_message_t *msg)
     }
     if (save) {
         state_save_later();
+    }
+    if (startup_key) {
+        startup_attr_save(startup_key, u8);
     }
 }
 

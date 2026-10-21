@@ -124,6 +124,14 @@ the LED driver coupling into the pad, not the sensor itself:
    reset. Neither reproduced in 21 more joins and 15 factory-reset boots (peaks 26–27 ‰). Scan worst 13–21 ‰,
    sweep peak 25 ‰, 6-minute soak at min and max peak 24 ‰, baseline 12.0 µs. Touch strength: taps 109–121 ‰,
    holds 132–133 ‰, light touches 49–84 ‰ (4 of 5 detected). Thresholds stay at ON 50 / OFF 25.
+9. **Power-on default is now off (2026-10-21).** The Hue app has no power-on setting for third-party lights and never
+   writes StartUpOnOff. The default now comes from Kconfig (`LAMP_STARTUP_ON_OFF`, Off). Older firmware saved
+   StartUp* to NVS on every state change, so the old "on" default was stuck in flash. StartUp* are now saved only
+   when a coordinator writes them (new keys), and the legacy keys are erased at boot, so an `app-flash` is enough.
+   Checked on the lamp while it was paired with Hue: it came up off at the previous level and rejoined.
+   `test_lamp.py`: the first run had 2 failures (`test_persistence`, `test_startup_on_off`) where the jig got no
+   response to a read for about 13 s after the lamp's reboot and rejoin; the lamp state was correct. Both passed when
+   rerun on their own, and a second full run gave 16 passed, 1 expected failure, 0 failed.
 
 **Still open**
 - **Library workarounds:** the descriptor and Off-with-effect fixes depend on esp-zigbee-lib 2.0.4 internals. Re-check
@@ -146,7 +154,7 @@ The lamp is a Zigbee 3.0 Dimmable Light (HA device 0x0101) acting as a router.
 | Removed by the coordinator (e.g. deleted in the Hue app) | The lamp factory-resets itself and starts pairing again |
 | Identify (Hue's "blink") | The LED blinks white |
 
-On/off, level, StartUpOnOff and StartUpCurrentLevel survive reboots. By default the light comes back on at its previous level.
+On/off, level, StartUpOnOff and StartUpCurrentLevel survive reboots. By default the light comes back on at its previous level. (Superseded by entry 9: the default is now off.)
 
 These Hue-specific details come from community reports:
 

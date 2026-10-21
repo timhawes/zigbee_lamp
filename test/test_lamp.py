@@ -386,6 +386,7 @@ def test_button_hold_from_off(r: Rig):
 
 
 def test_persistence(r: Rig):
+    r.write_attr(CL_ON_OFF, 0x4003, "0x30", "ff")  # StartUpOnOff = previous (the default is off)
     r.zcl_raw(CL_LEVEL, 0x04, "4D0000")  # on, level 77
     r.wait_level_settled()
     time.sleep(3)  # save debounce is 2 s
@@ -396,20 +397,24 @@ def test_persistence(r: Rig):
     time.sleep(2)
     check(r.read_u8(CL_LEVEL, 0) == 77, "level attribute not restored after reboot")
     check(r.read_u8(CL_ON_OFF, 0) == 1, "on/off attribute not restored after reboot")
+    r.write_attr(CL_ON_OFF, 0x4003, "0x30", "00")  # back to the default (off)
+    time.sleep(1)
 
 
 def test_startup_on_off(r: Rig):
-    r.write_attr(CL_ON_OFF, 0x4003, "0x30", "00")  # StartUpOnOff = off
+    # The default is off; check that a written StartUpOnOff = on overrides it and is persisted.
+    r.write_attr(CL_ON_OFF, 0x4003, "0x30", "01")  # StartUpOnOff = on
+    r.zcl_raw(CL_ON_OFF, 0x00)  # off
     time.sleep(3)
     r.lamp.reset()
-    r.lamp.expect(r"LIGHT on=0 level=\d+ src=boot", 10)
+    r.lamp.expect(r"LIGHT on=1 level=\d+ src=boot", 10)
     r.lamp.expect(r"Rejoined network", 15)
     r.lamp.wait_ready()
     time.sleep(2)
-    check(r.read_u8(CL_ON_OFF, 0) == 0, "lamp not off after reboot with StartUpOnOff=0")
-    check(r.read_u8(CL_ON_OFF, 0x4003) == 0, "StartUpOnOff not persisted")
-    r.write_attr(CL_ON_OFF, 0x4003, "0x30", "01")  # back to default (on)
-    time.sleep(3)
+    check(r.read_u8(CL_ON_OFF, 0) == 1, "lamp not on after reboot with StartUpOnOff=1")
+    check(r.read_u8(CL_ON_OFF, 0x4003) == 1, "StartUpOnOff not persisted")
+    r.write_attr(CL_ON_OFF, 0x4003, "0x30", "00")  # back to the default (off)
+    time.sleep(1)
 
 
 def test_remote_leave(r: Rig):
@@ -424,7 +429,7 @@ def test_remote_leave(r: Rig):
     time.sleep(2)
     st = r.lamp_status()
     check(st["joined"] == 1, "lamp did not rejoin")
-    check(st["on"] == 1 and st["level"] == 254, f"state not reset to defaults: {st}")
+    check(st["on"] == 0 and st["level"] == 254, f"state not reset to defaults: {st}")
 
 
 TESTS = [

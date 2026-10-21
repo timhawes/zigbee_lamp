@@ -16,9 +16,11 @@ button and the onboard WS2812 RGB LED (rendered white). See [Build profiles](#bu
 | Removed by the coordinator (e.g. deleted in the Hue app) | Factory resets itself and starts pairing again |
 | Identify / Hue "blink" | Light blinks at 1 Hz |
 
-On/off, level, StartUpOnOff and StartUpCurrentLevel are persisted in NVS. The default power-on behaviour is
-**on at the previous level**; the coordinator can change it by writing StartUpOnOff (0x0006/0x4003) and
-StartUpCurrentLevel (0x0008/0x4000).
+On/off and level are persisted in NVS. The default power-on behaviour is **off**, keeping the previous level, so a tap
+or "on" from Hue brings back the last brightness. The Hue app offers "Power-on behaviour" only for Hue's own lights, so
+the default is set at build time: `LAMP_STARTUP_ON_OFF` in menuconfig (Off / On / Previous). Other coordinators can
+override it by writing StartUpOnOff (0x0006/0x4003) and StartUpCurrentLevel (0x0008/0x4000). Written values are saved
+in NVS (`su_onoff_w` / `su_level_w`) and override the build default until a factory reset.
 
 ## Building
 

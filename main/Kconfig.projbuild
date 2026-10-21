@@ -202,6 +202,21 @@ menu "Lamp configuration"
             string "Basic cluster ModelIdentifier"
             default "C6-Zero-Lamp"
 
+        choice LAMP_STARTUP_ON_OFF
+            prompt "Default power-on state (StartUpOnOff)"
+            default LAMP_STARTUP_OFF
+            help
+                Used until a coordinator writes StartUpOnOff (0x0006/0x4003). The Hue Bridge
+                never writes it to third-party lights. The level is always the previous one.
+
+            config LAMP_STARTUP_OFF
+                bool "Off"
+            config LAMP_STARTUP_ON
+                bool "On"
+            config LAMP_STARTUP_PREVIOUS
+                bool "Previous state"
+        endchoice
+
         config LAMP_STEERING_RETRY_MS
             int "Delay between network-steering attempts while unjoined (ms)"
             default 10000

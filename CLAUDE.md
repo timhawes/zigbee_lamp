@@ -49,6 +49,9 @@ if the library is upgraded.
   production profile; at 2 kHz also levels ~245–251 snapped): this keeps the LED driver's switching from coupling
   into the touch pad. Production is 20 kHz, 11-bit. See README "PWM and touch
   interference". It is not a library workaround, but it looks odd.
+- **StartUp* attributes are saved only when a coordinator writes them** (NVS keys `su_onoff_w`/`su_level_w`). Otherwise the
+  Kconfig default (`LAMP_STARTUP_ON_OFF`, off) applies, because Hue never writes them. `state_load()` erases the legacy
+  `su_onoff`/`su_level` keys, which older firmware saved on every change.
 - **ZCL rule:** "Move to Level *with On/Off*" that ends at the minimum level turns the light off. Tests that need "on at level 1" send On, then a plain Move to Level.
 
 ## Debugging Hue traffic
