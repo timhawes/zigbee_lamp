@@ -1,7 +1,9 @@
 # CLAUDE.md
 
-Zigbee dimmable light firmware for the Waveshare ESP32-C6-Zero. The output is the onboard WS2812 (GPIO8) and the
-input is the BOOT button (GPIO9). The lamp is a router, HA Dimmable Light 0x0101, on endpoint 11. It's paired with the
+Zigbee dimmable light firmware for the Waveshare ESP32-C6-Zero, going into a SAD lamp. There are two build profiles.
+The dev profile (default, used on this PC's boards and the jig) uses the onboard WS2812 (GPIO8) and the BOOT button
+(GPIO9). The production profile (`-DLAMP_PROFILE=production`, build dir `build-prod/`) uses a charge-time touch pad
+(GPIO2 → resistor → GPIO3) and PWM to the LED driver (GPIO15); see README "Build profiles". The lamp is a router, HA Dimmable Light 0x0101, on endpoint 11. It's paired with the
 user's Philips Hue Bridge and works there: on/off, dimming, rooms, scenes, and the app following the button. Start
 with `README.md` (behaviour, Hue findings, limitations) and `test/README.md` (jig, console, sniffer). `REPORT.md` is the
 dated history; `PLAN.md` is the original plan.
@@ -43,6 +45,10 @@ if the library is upgraded.
 - **`report_later()`:** the code sends unsolicited On/Off and Level reports to the last controller, because Hue never configures reporting.
 - **`select_link_key()` / retry timer:** pairing alternates between the Hue/ZLL key with distributed security and the standard Zigbee 3.0 key with centralized security. A LEAVE signal while not joined is a failed join attempt, not a removal.
 - **Scenes:** the library stores no scenes, so recall returns NOT_FOUND. `test_scenes` is an expected failure. Hue still works because it sends direct commands after a group recall.
+- **PWM `hpoint` set per duty, LEDC counter reset at a fixed phase, exact-divider resolution** (`light_output.c`,
+  production profile; at 2 kHz also levels ~245–251 snapped): this keeps the LED driver's switching from coupling
+  into the touch pad. Production is 20 kHz, 11-bit. See README "PWM and touch
+  interference". It is not a library workaround, but it looks odd.
 - **ZCL rule:** "Move to Level *with On/Off*" that ends at the minimum level turns the light off. Tests that need "on at level 1" send On, then a plain Move to Level.
 
 ## Debugging Hue traffic
@@ -56,8 +62,19 @@ Run `jig_setup.sh` afterwards to restore the jig.
 
 ## Open items (production)
 
-- Real output stage: PWM with more than 8 bits, keeping the `light_output_set()` interface.
-- Final GPIOs, and `CONFIG_LAMP_TEST_CONSOLE=n`.
+- Touch is wired on the lamp board and works with PWM edge alignment; thresholds are ON 5 % / OFF 2.5 % / release 50 ms.
+  Final-wiring touch strength (REPORT entry 8): taps 109–121 ‰, holds ~133 ‰, light touches 49–84 ‰. Two
+  unrequested toggles during joins/boots on 2026-10-21 didn't reproduce in 36 more tries. Hands-off check: `touch raw`, then `btn press` toggles and `btn hold` sweeps;
+  expect no extra toggles and `TR` window deltas under about 30.
+- PWM is on GPIO15 with a 4.7 kΩ pull-down at the PT4115 (its DIM pin has a 200 kΩ internal pull-up). The pin is
+  left floating for 1 s after power-on (`LAMP_PWM_POWERON_DELAY_MS`): the 24 V power-up surge shifts the ESP32's
+  ground enough to flash the driver through a pin driven low.
+- Wiring is final. Set `CONFIG_LAMP_TEST_CONSOLE=n` in `sdkconfig.defaults.production`.
 - Optional Zigbee OTA. This needs two app partitions; currently there is a single factory slot.
 - Optional switching regulator, to cut heat.
-- The user hasn't confirmed the boot-time factory-reset gesture with the real button. Check before relying on it.
+- PWM is 20 kHz because the PT4115's inductor sings at 2 kHz (an inductor swap didn't help). It depends on the
+  rerouted pad lead and the 20 kHz edge placement (REPORT entries 5–7). Re-run `touch scan` after any wiring change.
+- The user is trying pad-lead routing (twisted pair, positions) using the interference indicator. Measure it with
+  `touch scan` (onboard LED: green to red; `SCAN worst=` per cycle). Turn `LAMP_INTERFERENCE_LED` off along with the
+  test console.
+- The factory-reset gesture (press within 5 s of power-up, hold 15 s) hasn't been triggered on hardware yet: it unpairs the lamp.

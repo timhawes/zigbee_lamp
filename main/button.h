@@ -8,7 +8,7 @@ typedef enum {
     BUTTON_EVENT_HOLD_START,  /* held past the hold threshold */
     BUTTON_EVENT_HOLD_TICK,   /* every poll period while held (after HOLD_START) */
     BUTTON_EVENT_HOLD_END,    /* released after HOLD_START */
-    BUTTON_EVENT_BOOT_RESET,  /* factory-reset gesture: pressed right after boot and held */
+    BUTTON_EVENT_BOOT_RESET,  /* factory-reset gesture: press started right after boot, held for the reset time */
 } button_event_t;
 
 /* Called from the button task. dt_ms is the poll period (for HOLD_TICK). */

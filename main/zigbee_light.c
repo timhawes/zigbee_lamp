@@ -312,7 +312,9 @@ static void log_network(const char *what)
 static void set_joined(bool joined)
 {
     s_joined = joined;
+#if CONFIG_LAMP_PAIRING_INDICATION
     light_output_set_effect(joined ? LIGHT_EFFECT_NONE : LIGHT_EFFECT_PAIRING);
+#endif
 }
 
 static void do_factory_reset(void *arg)
@@ -827,6 +829,6 @@ void zigbee_light_print_status(void)
         channel = ezb_nwk_get_current_channel();
         esp_zigbee_lock_release();
     }
-    printf("STATUS on=%d level=%d joined=%d short=0x%04x pan=0x%04x channel=%d rgb=0x%06" PRIx32 " txpower=%d\n", on, level,
-           s_joined, short_addr, pan, channel, light_output_get_rgb(), tx_power);
+    printf("STATUS on=%d level=%d joined=%d short=0x%04x pan=0x%04x channel=%d out=0x%06" PRIx32 " txpower=%d\n", on, level,
+           s_joined, short_addr, pan, channel, light_output_get_raw(), tx_power);
 }

@@ -1,23 +1,22 @@
 menu "Lamp configuration"
 
     menu "Hardware"
-        config LAMP_LED_GPIO
-            int "WS2812 RGB LED GPIO"
-            default 8
+        choice LAMP_INPUT
+            prompt "Local control input"
+            default LAMP_INPUT_BUTTON
             help
-                Data pin of the addressable LED used as the light output.
-                GPIO8 on the Waveshare ESP32-C6-Zero.
+                The dev board uses the BOOT button. The production lamp uses a
+                touch pad sensed with two GPIOs and a high-value resistor.
 
-        config LAMP_LED_MAX_BRIGHTNESS
-            int "LED channel value at full level (1-255)"
-            range 1 255
-            default 255
-            help
-                Caps the RGB channel value at level 254. The onboard LED is very
-                bright, so this can be lowered for desk testing.
+            config LAMP_INPUT_BUTTON
+                bool "Push button on a GPIO"
+            config LAMP_INPUT_TOUCH
+                bool "Touch pad (charge-time sensing, two GPIOs + resistor)"
+        endchoice
 
         config LAMP_BUTTON_GPIO
             int "Button GPIO"
+            depends on LAMP_INPUT_BUTTON
             default 9
             help
                 Local control button. GPIO9 is the BOOT button on the
@@ -25,11 +24,154 @@ menu "Lamp configuration"
 
         config LAMP_BUTTON_ACTIVE_LOW
             bool "Button is active low"
+            depends on LAMP_INPUT_BUTTON
             default y
 
         config LAMP_BUTTON_PULLUP
             bool "Enable internal pull-up on the button pin"
+            depends on LAMP_INPUT_BUTTON
             default y
+
+        config LAMP_TOUCH_SEND_GPIO
+            int "Touch send GPIO (drives the resistor)"
+            depends on LAMP_INPUT_TOUCH
+            default 2
+
+        config LAMP_TOUCH_RECV_GPIO
+            int "Touch receive GPIO (pad side of the resistor)"
+            depends on LAMP_INPUT_TOUCH
+            default 3
+
+        config LAMP_TOUCH_DRIVE_HZ
+            int "Touch drive frequency (Hz)"
+            depends on LAMP_INPUT_TOUCH
+            range 100 20000
+            default 1000
+            help
+                Square wave on the send pin. Each half period must be longer
+                than about 5 RC time constants of the resistor and pad.
+
+        config LAMP_TOUCH_ON_PERMILLE
+            int "Touch threshold (per mille above baseline)"
+            depends on LAMP_INPUT_TOUCH
+            range 1 1000
+            default 50
+            help
+                Tune with the "touch watch" console command.
+
+        config LAMP_TOUCH_OFF_PERMILLE
+            int "Release threshold (per mille above baseline)"
+            depends on LAMP_INPUT_TOUCH
+            range 0 1000
+            default 25
+
+        config LAMP_TOUCH_RELEASE_MS
+            int "Release only after the signal stays below the release threshold this long (ms)"
+            depends on LAMP_INPUT_TOUCH
+            range 0 1000
+            default 50
+            help
+                Ignores brief dips in the reading during a touch, so they don't end the touch and
+                start a new one. The delay adds to the time a tap takes to act.
+
+        config LAMP_TOUCH_STUCK_MS
+            int "Recalibrate after a continuous touch this long (ms)"
+            depends on LAMP_INPUT_TOUCH
+            default 60000
+            help
+                Must be longer than the factory-reset hold time.
+
+        choice LAMP_OUTPUT
+            prompt "Light output"
+            default LAMP_OUTPUT_WS2812
+
+            config LAMP_OUTPUT_WS2812
+                bool "WS2812 RGB LED (dev board, rendered as white)"
+            config LAMP_OUTPUT_PWM
+                bool "PWM to an LED driver"
+        endchoice
+
+        config LAMP_LED_GPIO
+            int "WS2812 RGB LED GPIO"
+            depends on LAMP_OUTPUT_WS2812 || LAMP_INTERFERENCE_LED
+            default 8
+            help
+                Data pin of the onboard addressable LED: the light output in the dev
+                profile, or the interference indicator. GPIO8 on the Waveshare ESP32-C6-Zero.
+
+        config LAMP_LED_MAX_BRIGHTNESS
+            int "LED channel value at full level (1-255)"
+            depends on LAMP_OUTPUT_WS2812
+            range 1 255
+            default 255
+            help
+                Caps the RGB channel value at level 254. The onboard LED is very
+                bright, so this can be lowered for desk testing.
+
+        config LAMP_PWM_GPIO
+            int "PWM output GPIO"
+            depends on LAMP_OUTPUT_PWM
+            default 18
+
+        config LAMP_PWM_FREQ_HZ
+            int "PWM frequency (Hz)"
+            depends on LAMP_OUTPUT_PWM
+            range 100 40000
+            default 2000
+            help
+                The duty resolution is the highest that gives exactly this
+                frequency from the 80 MHz LEDC clock (14 bits at 2 kHz, 11 at 20 kHz).
+                With touch input, keep this a multiple of twice LAMP_TOUCH_DRIVE_HZ so the
+                PWM can be phase-locked to the touch measurement, with its edges placed
+                clear of it: otherwise it beats against it. The placement constants were
+                measured at 2 kHz and 20 kHz (light_output.c).
+
+        config LAMP_PWM_POWERON_DELAY_MS
+            int "Leave the PWM pin floating this long after power-on (ms)"
+            depends on LAMP_OUTPUT_PWM
+            range 0 5000
+            default 1000
+            help
+                After a power-on or brown-out reset, wait this long before driving
+                the PWM pin, so a pull-down at the LED driver holds it off while the
+                supply settles. Driving the pin low during the power-up surge ties the
+                driver's dimming input to the ESP32's ground, which can be shifted
+                enough to flash the LED. Other resets aren't delayed.
+
+        config LAMP_PWM_INVERT
+            bool "Invert PWM output (driver input active low)"
+            depends on LAMP_OUTPUT_PWM
+            default n
+
+        config LAMP_PWM_MIN_DUTY_PERMILLE
+            int "Duty at the lowest level (per mille, 0 = one count)"
+            depends on LAMP_OUTPUT_PWM
+            range 0 1000
+            default 0
+            help
+                Raise this if the driver doesn't light below some duty.
+
+        config LAMP_PWM_MAX_DUTY_PERMILLE
+            int "Duty at full level (per mille)"
+            depends on LAMP_OUTPUT_PWM
+            range 1 1000
+            default 1000
+
+        config LAMP_INTERFERENCE_LED
+            bool "Show touch interference on the onboard LED"
+            depends on LAMP_INPUT_TOUCH && LAMP_OUTPUT_PWM
+            default y
+            help
+                Colours the onboard WS2812 from green (no interference) to red (enough
+                to cause false touches, i.e. the ON threshold). Normally it shows how far
+                the untouched reading moves; during "touch scan" it shows the worst offset
+                found while the PWM sweeps from off to full. For trying out the touch
+                wiring; turn it off with the test console once the wiring is final.
+
+        config LAMP_PAIRING_INDICATION
+            bool "Breathe the output while not joined to a network"
+            default y if LAMP_OUTPUT_WS2812
+            default n
     endmenu
 
     menu "Button behaviour"
@@ -43,11 +185,11 @@ menu "Lamp configuration"
 
         config LAMP_BOOT_RESET_WINDOW_MS
             int "Factory-reset gesture: press must start within this time after boot (ms)"
-            default 1000
+            default 5000
 
         config LAMP_BOOT_RESET_HOLD_MS
             int "Factory-reset gesture: hold time required (ms)"
-            default 2000
+            default 15000
     endmenu
 
     menu "Zigbee"

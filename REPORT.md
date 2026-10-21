@@ -47,10 +47,88 @@ library: the bridge recalls the scene through a group, then sends on/off and lev
 to the git-ignored `sdkconfig.local`. The project is in git. `CLAUDE.md` holds the hand-over notes and the production
 to-do list.
 
+## Update: production I/O for the SAD lamp (2026-10-17)
+
+The firmware now has a production build profile (`-DLAMP_PROFILE=production`) for the SAD lamp: a touch pad behind the
+plastic as input, and 3.3 V PWM into the existing LED driver as output. The dev profile (button + WS2812) is unchanged,
+so the jig and Hue setup keep working. Wiring, profiles and touch tuning are in the README.
+
+- **Touch:** charge-time sensing with two GPIOs and a 1–2.2 MΩ resistor. MCPWM drives the send pin at 1 kHz, and a
+  synced capture channel times each edge at the pad (12.5 ns resolution). Baseline is calibrated in the first 300 ms,
+  tracks drift, and recalibrates after a 60 s stuck touch. Checked in loopback on the board (40 edges per 20 ms,
+  steady 62 ns); not yet tried with a real pad.
+- **PWM:** LEDC, 2 kHz, 15-bit; frequency, polarity and min/max duty are in menuconfig. Duty readback checked
+  against the gamma curve.
+- **Factory reset:** a press started within 5 s of power-up and held for 15 s, in both profiles. Such a press now acts
+  normally until 15 s (tap toggles, hold dims). Checked on the lamp: a tap at 1.6 s toggled, and a 16 s hold
+  started at 7 s didn't reset. The reset itself wasn't triggered, to keep the Hue pairing.
+- **Indication:** no pairing indication in production; the lamp works normally while unpaired. Identify blinks at 1 Hz,
+  and the reset blink is 2 Hz (under 3 flashes per second).
+- `status` prints `out=` instead of `rgb=`; `test_lamp.py` was updated, but the suite hasn't been run on this change.
+
+## Update: touch on the real lamp (2026-10-17)
+
+The production build is on the lamp board with the pad and the driver wired up. Two problems turned up, and both were
+the LED driver coupling into the pad, not the sensor itself:
+
+1. **Flashing on a firm touch.** At 15-bit resolution the PWM ran at 2003.2 Hz, which beat against the 1 kHz touch
+   drive at 3.2 Hz. The reading swung to zero every 312 ms, and each swing counted as a new tap. Fixed by picking the
+   resolution that gives an exact divider (14-bit), plus a 50 ms release filter and a 500 ms hold threshold.
+2. **Phantom touch after switching on.** With the frequencies locked, the PWM edges land at a fixed phase relative to the
+   measurement. Untouched, the reading then shifted by up to 80 %, depending on the phase. A sweep of duty × phase
+   (`touch raw` with a temporary console hook) mapped which edge positions are safe. The firmware now finds the phase at
+   boot and places each pulse accordingly. Hands-off on/off and dimming tests show no extra toggles, and the untouched
+   offset is within ±1 %.
+3. **Flash when dimming down through about 9 % duty** (32 % in Hue). With the phase alignment, pulses above a boot-dependent
+   duty crossed the LEDC counter wrap. The LEDC loads a new duty at the wrap, so a shorter duty arriving mid-pulse
+   held the output high for almost a whole period. The firmware now resets the LEDC counter 30 µs after a drive edge,
+   so no pulse crosses the wrap (checked for every duty, with ±3 µs of origin error). The level-1 floor is now 1 % duty,
+   because a single 30 ns count didn't light the driver.
+4. **Switching off paused at minimum brightness.** The fade's tail sat at the 1 % floor for about half a second. While
+   fading to off, the floor now shrinks in proportion to the fade. From level 101, the light goes dark in about 610 ms
+   with no plateau.
+5. **Ultrasonic PWM tried, reverted (2026-10-18).** The lamp is faintly audible at 2 kHz, so 20 kHz and 21 kHz were
+   tried (11-bit, 4 % floor; the PT4115 datasheet gives a 4 % minimum duty at 20 kHz). Edge alignment can't fit in a
+   50 µs period, and untouched window deltas rose to 220 ‰ at 20 kHz and ±300 ‰ at 21 kHz, against an ON threshold of
+   50 ‰. The lamp toggled and dimmed itself. Back at 2 kHz the same sweep stays within −22…+25 ‰, with no extra
+   toggles. Any fix for the noise has to be in hardware (see README "Known limitations").
+6. **Interference indicator (2026-10-18).** For trying out the pad wiring, the onboard WS2812 now shows the touch
+   interference from green to red (the ON threshold). `touch scan` sweeps the PWM hands-off and reports the worst
+   offset per 10 % band of duty. First scans at 2 kHz: worst 35–48 ‰, mostly at 80–100 % duty. The LED's data line
+   didn't measurably add noise (an A/B sweep with it disabled was no better).
+   After the user rerouted the pad lead twice: the second layout was clean up to 60 % but reached 67–105 ‰ at
+   90–100 % (the driver's continuous switching; there are no PWM edges at 100 %). The third layout is flat at a
+   worst of 10–13 ‰ across all duties (dimming sweep: −9…+17 ‰, 4/4 toggles). The baseline fell from 16.0 to
+   12.0 µs as the lead got shorter.
+   With this layout 20 kHz PWM (11-bit, 4 % floor) also works: scan worst 30–37 ‰, dimming sweep peak 45 ‰ at
+   65–75 % duty, 4/4 toggles. That's only just under the 50 ‰ ON threshold, so 2 kHz stays the default for now.
+7. **20 kHz made the default, with edge placement (2026-10-19).** The inductor swap didn't stop the singing. At
+   20 kHz the PWM phase relative to the touch drive was random at each boot, with a worst offset of 30–49 ‰. A map of
+   offset against duty and phase showed that only edges in the first ~15 µs after a drive edge matter, at up to
+   65 ‰. The LEDC counter now resets 20 µs after a drive edge; short pulses rise there and long pulses fall there.
+   Scan worst 12–16 ‰ (the noise floor), dimming sweep peak 23 ‰, 4/4 toggles. 11-bit, 4 % floor. New console
+   commands: `pwm phase <us>`, `pwm test <per mille>|off`.
+   Touch strength with this wiring (user, 20 kHz): normal taps 89–95 ‰, holds 122–126 ‰, light taps 57–82 ‰,
+   untouched peak 19 ‰ over the same 40 s. All 14 touches were detected. The thresholds stay at ON 50 / OFF 25.
+   One toggle 2.6 s after a reset, just before that capture, couldn't be reproduced hands-off. There were no touch
+   events in 28 boots (10 at level 81 and 6 each at level 1, at 254 and with the light off): the untouched peak was
+   13–22 ‰ in every boot. An 8-minute soak had a peak of 18 ‰ and no events.
+8. **Flash at power-up; PWM moved to GPIO15 (2026-10-21).** Two causes. The PT4115's DIM pin has an internal 200 kΩ
+   pull-up (4.5 V open), so the 100 kΩ/47 kΩ pull-down left it at about 0.9 V (analogue dimming) while the chip
+   was in reset; the pull-down is now 4.7 kΩ at the driver. On 24 V power (via the DC-DC), the supply surge shifted
+   the ESP32's ground, so a pin driven low still flashed the driver; it stayed off with the pin floating (reset
+   held). The firmware now leaves the pin floating for `LAMP_PWM_POWERON_DELAY_MS` (1 s) after a power-on or
+   brown-out reset. The user then moved PWM to GPIO15.
+   Final-wiring tests: `test_lamp.py` 15 passed, 1 expected failure, 1 failed (`test_remote_leave`: an unrequested
+   touch toggle while rejoining); that test then passed 4/4. A second unrequested toggle came 2.4 s after a factory
+   reset. Neither reproduced in 21 more joins and 15 factory-reset boots (peaks 26–27 ‰). Scan worst 13–21 ‰,
+   sweep peak 25 ‰, 6-minute soak at min and max peak 24 ‰, baseline 12.0 µs. Touch strength: taps 109–121 ‰,
+   holds 132–133 ‰, light touches 49–84 ‰ (4 of 5 detected). Thresholds stay at ON 50 / OFF 25.
+
 **Still open**
 - **Library workarounds:** the descriptor and Off-with-effect fixes depend on esp-zigbee-lib 2.0.4 internals. Re-check
   them if you upgrade the library.
-- **Production:** PWM output stage, final GPIOs, test console off, optional OTA and a switching regulator.
+- **Production:** tune touch thresholds and the PWM duty floor on the real lamp, confirm the final GPIOs, then turn the test console off. Optional OTA and a switching regulator.
 
 The sections below are the original report. Where they conflict, this update supersedes them (the test count, the Hue
 key limitation, and the factory-reset paths).

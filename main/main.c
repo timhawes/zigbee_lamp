@@ -1,6 +1,7 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 
+#include "interference_led.h"
 #include "light_output.h"
 #include "local_control.h"
 #include "test_console.h"
@@ -21,6 +22,7 @@ void app_main(void)
     /* Start the button first so the boot-time factory-reset gesture is caught promptly. */
     ESP_ERROR_CHECK(local_control_init());
     ESP_ERROR_CHECK(light_output_init());
+    ESP_ERROR_CHECK(interference_led_start());
     ESP_ERROR_CHECK(zigbee_light_start());
     ESP_ERROR_CHECK(test_console_start());
 }

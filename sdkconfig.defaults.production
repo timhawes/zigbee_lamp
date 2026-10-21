@@ -1,0 +1,18 @@
+# Production lamp hardware: touch pad input, PWM to the LED driver.
+# Build: idf.py -B build-prod -DSDKCONFIG=build-prod/sdkconfig -DLAMP_PROFILE=production build
+CONFIG_LAMP_INPUT_TOUCH=y
+CONFIG_LAMP_TOUCH_SEND_GPIO=2
+CONFIG_LAMP_TOUCH_RECV_GPIO=3
+CONFIG_LAMP_OUTPUT_PWM=y
+CONFIG_LAMP_PWM_GPIO=15
+# 20 kHz: above hearing (the driver's inductor sings at 2 kHz). Too short a period to align the edges to the
+# touch measurement; works with the pad lead routed away from the driver (README "Interference indicator").
+CONFIG_LAMP_PWM_FREQ_HZ=20000
+# Duty at level 1. The PT4115 needs about 4 % at 20 kHz (datasheet: 25:1 range).
+CONFIG_LAMP_PWM_MIN_DUTY_PERMILLE=40
+CONFIG_LAMP_PAIRING_INDICATION=n
+# Taps through the plastic last about 300 ms; 400 ms (the default) mistook some for holds.
+CONFIG_LAMP_HOLD_THRESHOLD_MS=500
+
+# Kept on until the touch thresholds are tuned on the real lamp; then set to n.
+CONFIG_LAMP_TEST_CONSOLE=y

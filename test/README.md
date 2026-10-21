@@ -23,11 +23,13 @@ fixed scenes.
 
 | Command | Output |
 |---|---|
-| `status` | `STATUS on= level= joined= short= pan= channel= rgb= txpower=`; `rgb` is the bytes last sent to the LED (0xRRGGBB) |
+| `status` | `STATUS on= level= joined= short= pan= channel= out= txpower=`; `out` is the value last written to the output: 0xRRGGBB for the WS2812, the duty count for PWM |
 | `btn press [ms]`, `btn hold <ms>` | Injects a button press through the real debounce/hold logic |
 | `temp` | `TEMP <°C>`, the chip's internal sensor, in 1 °C steps (about 48 °C when idle and off) |
 | `scan` | Lists nearby Zigbee networks |
 | `factory_reset` | Leaves the network and starts pairing |
+| `touch [watch <s> \| raw <s> \| scan [s]]` | Touch builds only: `TOUCH raw= baseline= delta= edges= calibrated= touched= interference=` (delays in ns, delta and interference in per mille). `scan` (PWM builds) sweeps the PWM hands-off for the given seconds (default 60, 0 stops) and prints `SCAN worst= ref= <10 bands>` per 2.3 s cycle; see README "Interference indicator". `watch` streams at 10 Hz. `raw` streams every 10 ms frame in the background, as `TR <ms> <frame delta> <20 ms delta> <edges> <touched> <PWM duty>`, while other commands keep working |
+| `pwm phase <us>` / `pwm test <per mille>\|off` | Production PWM only: re-lock the PWM counter at a phase after the touch drive edge, or hold a fixed duty (touches are ignored meanwhile). For mapping the PWM's coupling into the touch pad |
 
 ## Sniffer (debugging joins and traffic)
 

@@ -88,9 +88,9 @@ class Rig:
 
     def lamp_status(self):
         self.lamp.send("status")
-        m = self.lamp.expect(r"STATUS on=(\d) level=(\d+) joined=(\d) short=(0x[0-9a-f]+).* rgb=(0x[0-9a-f]+)", 5)
+        m = self.lamp.expect(r"STATUS on=(\d) level=(\d+) joined=(\d) short=(0x[0-9a-f]+).* out=(0x[0-9a-f]+)", 5)
         return {"on": int(m.group(1)), "level": int(m.group(2)), "joined": int(m.group(3)), "short": m.group(4),
-                "rgb": int(m.group(5), 16)}
+                "out": int(m.group(5), 16)}
 
     def wait_level_settled(self, timeout=5.0):
         """Wait until the lamp stops reporting LIGHT changes for 0.7 s."""
@@ -324,14 +324,14 @@ def test_button_toggle_at_min(r: Rig):
     time.sleep(1.0)  # let the renderer settle
     st = r.lamp_status()
     check(st["on"] == 1 and st["level"] == 1, f"lamp not on at level 1: {st}")
-    check(st["rgb"] != 0, "LED dark while on at level 1")
+    check(st["out"] != 0, "LED dark while on at level 1")
     for want_on in (0, 1):
         r.lamp.send("btn press 150")
         r.lamp.expect(r"Toggle -> ", 2)
         time.sleep(1.0)
         st = r.lamp_status()
         check(st["on"] == want_on, f"lamp did not toggle: {st}")
-        check((st["rgb"] != 0) == bool(want_on), f"LED output wrong after toggle: {st}")
+        check((st["out"] != 0) == bool(want_on), f"LED output wrong after toggle: {st}")
     r.zcl_raw(CL_LEVEL, 0x04, "800000")  # leave it at mid level for later tests
 
 
